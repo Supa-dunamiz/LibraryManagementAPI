@@ -43,11 +43,9 @@ builder.Services.AddAuthentication(options =>
 
 builder.Services.AddAuthorization();
 
-// -- Swagger with JWT (security definition + global requirement) --
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    // Define the security scheme
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Description = "Enter the JWT token. Example: \"<JWT>\" (You only need to paste the token if scheme=Bearer http will prepend).",
@@ -58,7 +56,6 @@ builder.Services.AddSwaggerGen(c =>
         BearerFormat = "JWT"
     });
 
-    // Require bearer token globally (applies to all endpoints in Swagger UI)
     c.AddSecurityRequirement(new OpenApiSecurityRequirement{
         {
             new OpenApiSecurityScheme{
@@ -74,11 +71,14 @@ builder.Services.AddSwaggerGen(c =>
 
 var app = builder.Build();
 
-// Seed DB (if you have a DbInitializer)
-using (var scope = app.Services.CreateScope())
+bool runSeed = builder.Configuration.GetValue<bool>("RunSeedOperation");
+if (runSeed)
 {
-    var ctx = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    await DbInitializer.InitializeAsync(ctx);
+    using (var scope = app.Services.CreateScope())
+    {
+        var ctx = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await DbInitializer.InitializeAsync(ctx);
+    }
 }
 
 if (app.Environment.IsDevelopment())
@@ -91,7 +91,7 @@ app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 app.UseHttpsRedirection();
 
-app.UseAuthentication(); // must be before Authorization
+app.UseAuthentication(); 
 app.UseAuthorization();
 
 app.MapControllers();
