@@ -24,7 +24,6 @@ namespace LibraryManagement.Repository
         private readonly Microsoft.AspNetCore.Identity.PasswordHasher<User> _hasher;
         private readonly ILogger<AuthService> _logger;
 
-
         public AuthService(AppDbContext ctx, IConfiguration config, ILogger<AuthService> logger)
         {
             _ctx = ctx;
@@ -33,6 +32,14 @@ namespace LibraryManagement.Repository
             _logger = logger;
         }
 
+        /// <summary>
+        /// RegisterAsync
+        /// Business logic:
+        ///  - Check for existing username to ensure uniqueness.
+        ///  - Hash the plain-text password using a secure password hasher before persisting.
+        ///  - Persist the new user and return an OperationResult containing the created user on success.
+        ///  - Catch and log exceptions; return a friendly message to callers without leaking internals.
+        /// </summary>
         public async Task<OperationResult<User?>> RegisterAsync(string username, string password)
         {
             try
@@ -47,9 +54,12 @@ namespace LibraryManagement.Repository
                 }
 
                 var user = new User { Username = username };
+
+                // Hash the password before saving
                 user.PasswordHash = _hasher.HashPassword(user, password);
 
                 _ctx.Users.Add(user);
+
                 await _ctx.SaveChangesAsync();
 
                 return new OperationResult<User?>
@@ -69,9 +79,18 @@ namespace LibraryManagement.Repository
             }
         }
 
+        /// <summary>
+        /// LoginAsync
+        /// Business logic:
+        ///  - Validate input parameters (username/password).
+        ///  - Load the user by username (async).
+        ///  - Verify the provided password against the stored hash.
+        ///  - If verification succeeds, build a JWT (claims, signing credentials, expiry) and return it.
+        ///  - On failures (invalid credentials) return an OperationResult with an empty Data and a message.
+        /// </summary>
         public async Task<OperationResult<string>> LoginAsync(string username, string password)
         {
-            if(string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
+            if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
             {
                 return new OperationResult<string>
                 {
@@ -92,6 +111,7 @@ namespace LibraryManagement.Repository
                     };
                 }
 
+                // Verify password against stored hash
                 var result = _hasher.VerifyHashedPassword(user, user.PasswordHash, password);
 
                 if (result == Microsoft.AspNetCore.Identity.PasswordVerificationResult.Failed)
@@ -103,7 +123,6 @@ namespace LibraryManagement.Repository
                     };
                 }
 
-                // Create JWT
                 var jwtSettings = _config.GetSection("Jwt");
 
                 var key = new SymmetricSecurityKey(
@@ -114,9 +133,9 @@ namespace LibraryManagement.Repository
 
                 var claims = new[]
                 {
-                    new Claim(JwtRegisteredClaimNames.Sub, user.Username),
-                    new Claim("id", user.Id.ToString())
-                };
+                new Claim(JwtRegisteredClaimNames.Sub, user.Username),
+                new Claim("id", user.Id.ToString())
+            };
 
                 var token = new JwtSecurityToken(
                     issuer: jwtSettings.GetValue<string>("Issuer"),

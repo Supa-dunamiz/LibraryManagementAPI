@@ -27,6 +27,14 @@ namespace LibraryManagement.Repository
             _logger = logger;
         }
 
+        /// <summary>
+        /// Create a new book record.
+        /// Business logic:
+        /// - Validate incoming DTO (delegates to ValidateBookDtoAsync).
+        /// - If validation fails, return the validation message without touching the database.
+        /// - If valid, map DTO -> Entity, save to DB and return a read DTO.
+        /// - Exceptions are logged and returned as error messages in the operation result.
+        /// </summary>
         public async Task<OperationResult<BookReadDto>> CreateAsync(BookDto dto)
         {
             var validationResult = await ValidateBookDtoAsync(dto);
@@ -61,6 +69,14 @@ namespace LibraryManagement.Repository
             }
         }
 
+        /// <summary>
+        /// Retrieve paged list of books with optional search.
+        /// Business logic:
+        /// - Validate paging params (pageNumber must be > 0).
+        /// - Apply optional search filter against Title and Author.
+        /// - Return total count and the paged items (DTOs).
+        /// - Uses AsNoTracking for read-only performance.
+        /// </summary>
         public async Task<OperationResult<PagedResult>> GetAllAsync(string? search, int pageNumber, int pageSize)
         {
             if (pageNumber <= 0)
@@ -103,6 +119,13 @@ namespace LibraryManagement.Repository
             }
         }
 
+        /// <summary>
+        /// Retrieve a single book by id.
+        /// Business logic:
+        /// - Validate id (must be positive).
+        /// - Use FindAsync which returns null if not found.
+        /// - Map to DTO and return or return not-found message.
+        /// </summary>
         public async Task<OperationResult<BookReadDto?>> GetByIdAsync(int id)
         {
             if (id <= 0)
@@ -123,6 +146,14 @@ namespace LibraryManagement.Repository
             }
         }
 
+        /// <summary>
+        /// Update a book. Only supplied fields on the DTO are applied.
+        /// Business logic:
+        /// - Validate DTO for update semantics (id present and at least one updatable field).
+        /// - If validation fails, return message without DB changes.
+        /// - Retrieve existing entity, apply only provided fields, and save.
+        /// - Any exception is logged and returned as an error message.
+        /// </summary>
         public async Task<OperationResult<bool>> UpdateAsync(int id, BookDto dto)
         {
             // Validate incoming DTO (including the "no field supplied" rule)
@@ -167,6 +198,13 @@ namespace LibraryManagement.Repository
             }
         }
 
+        /// <summary>
+        /// Delete a book by id.
+        /// Business logic:
+        /// - Validate id, attempt to find entity, remove and persist.
+        /// - Return appropriate success/failure message.
+        /// - Exceptions are logged and surfaced as error messages.
+        /// </summary>
         public async Task<OperationResult<bool>> DeleteAsync(int id)
         {
             if (id <= 0)
@@ -190,6 +228,7 @@ namespace LibraryManagement.Repository
             }
         }
 
+        // Simple mapper from entity to read DTO. Kept private to encapsulate mapping logic.
         private static BookReadDto ToReadDto(Book b) =>
             new BookReadDto
             {
@@ -200,6 +239,14 @@ namespace LibraryManagement.Repository
                 PublishedDate = b.PublishedDate
             };
 
+        /// <summary>
+        /// Validate the incoming BookDto for both create and update scenarios.
+        /// Business logic:
+        /// - For create: all fields are required.
+        /// - For update: id must be valid and at least one updatable field must be supplied.
+        /// - ISBN uniqueness is enforced only when an ISBN value is provided.
+        /// - Returns a boolean operation result with a message describing validation state.
+        /// </summary>
         private async Task<OperationResult<bool>> ValidateBookDtoAsync(BookDto dto, bool isUpdate = false, int? id = null)
         {
 
